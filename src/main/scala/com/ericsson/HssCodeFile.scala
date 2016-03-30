@@ -13,18 +13,23 @@ import scalax.file.Path
 /**
  * Created by esipeng on 2/3/2016.
  */
-class HssCodeFile(val fileName:String) {
 
-  val translationUnit = initTranslationUnit()
+class HssCodeFile(val codeName:HssCodeFileName) {
+  val fileName = codeName.fullName
+  //var translationUnit = initTranslationUnit()
   val lineStartPositions = initLineStartPositions()
-  val problem:collection.mutable.Set[HssFunctionProblem] = collection.mutable.Set.empty[HssFunctionProblem]
 
   //parsing source file to get all the functions
-  for( node <- translationUnit.getChildren()) {
-    if(node.isInstanceOf[CPPASTFunctionDefinition]) {
+  val functions = collection.mutable.Set.empty[HssFunction]
+
+  for( node <- initTranslationUnit().getChildren() if(node.isInstanceOf[CPPASTFunctionDefinition])) {
       val function = node.asInstanceOf[CPPASTFunctionDefinition]
-      parseFunction(function)
-    }
+      parseFunction(function) match {
+        case None => {}
+        case Some(c) => {
+          functions += c
+        }
+      }
   }
 
 
@@ -51,28 +56,32 @@ class HssCodeFile(val fileName:String) {
     val lineLengths = Path.fromString(fileName).lines(includeTerminator = true).map(_.length)
     //calculating line start positions
     val lineStartPositions = new Array[Int](lineLengths.size)
-    lineStartPositions(0) = 0
-    for( i <- 1 to lineLengths.size-1) {
-      lineStartPositions(i) = lineStartPositions(i-1) + lineLengths(i-1)
+    if(lineLengths.size > 0)  {
+      lineStartPositions(0) = 0
+      for( i <- 1 to lineLengths.size-1) {
+        lineStartPositions(i) = lineStartPositions(i-1) + lineLengths(i-1)
+      }
     }
+
     lineStartPositions
   }
 
-  def parseFunction(function:CPPASTFunctionDefinition) = {
+  def parseFunction(function:CPPASTFunctionDefinition):Option[HssFunction] = {
     var functionName:String = ""
     var enterLine:Int = -1
     val exitLine:collection.mutable.ArrayBuffer[Int] = collection.mutable.ArrayBuffer.empty[Int]
-
+    val problem:collection.mutable.Set[HssFunctionProblem] = collection.mutable.Set.empty[HssFunctionProblem]
 
     getFunctionDeclarator(function) match {
       case Some(declarator) => { functionName = declarator; HssCodeFile.logger.debug("Function Name = {}",declarator)}
-      case None => {HssCodeFile.logger.warn("Function Declarator not found {}",function.getRawSignature)}
+      case None => {HssCodeFile.logger.warn("Function Declarator not found {}",function.getRawSignature); return None}
     }
 
     val statements = getFunctionStatements(function)
     if(statements.size < 2) {
       if(statements.size != 0)
         problem.add(HssFunctionProblem.INSUFFICIENT_STATEMENT)
+
     } else  {
       val enterMacro = """.*HSS_\w+_TRACE_ENTER.*""".r
       val exitMacro = """.*HSS_\w+_TRACE_EXIT.*""".r
@@ -82,7 +91,8 @@ class HssCodeFile(val fileName:String) {
         val temp = firstStatement.getNodeLocations
         enterLine = getLineNumberFromPosition(firstStatement.getNodeLocations.head.getNodeOffset)
         HssCodeFile.logger.debug("ENTER line is {}",enterLine)
-      }
+      } else
+        problem.add(HssFunctionProblem.FIRST_STATEMENT_NOT_ENTER)
 
       //Rule: Last statement should be EXIT or RETURN
       val lastStatement = statements.last
@@ -90,15 +100,27 @@ class HssCodeFile(val fileName:String) {
         problem.add(HssFunctionProblem.LAST_STATEMENT_NOT_EXIT)
       }
 
-      //go over all the statements to find all the EXIT ways
+      //go over all the statements to find all the EXIT ways //CPPASTReturnStatement
+      var previous:IASTNode = null
       for( c <- statements) {
+        val raw = c.getRawSignature
+        if(c.isInstanceOf[CPPASTReturnStatement]) {
+          if(previous == null || exitMacro.pattern.matcher(previous.getRawSignature).matches() ==false) {
+            problem.add(HssFunctionProblem.LAST_STATEMENT_NOT_EXIT)
+          }
+        }
         if (exitMacro.pattern.matcher(c.getRawSignature).matches()) {
           val line = getLineNumberFromPosition(c.getNodeLocations().head.getNodeOffset)
           HssCodeFile.logger.debug("EXIT line is {}",line)
           exitLine.add(line)
         }
+
+        previous = c
       }
+
+
     }
+    Some(HssFunction(functionName,enterLine,exitLine,problem.toSet))
   }
 
   def getLineNumberFromPosition(position:Int):Int = {
@@ -113,12 +135,23 @@ class HssCodeFile(val fileName:String) {
   }
 
   def getFunctionStatements(node:IASTNode):Seq[IASTNode] = {
-    val collect = collection.mutable.ArrayBuffer.empty[IASTNode]
     //Recursively get all the statement, seeking first statement if needed to see if it is enter macro
-    for (c <- node.getChildren
-          if (c.isInstanceOf[CPPASTCompoundStatement] || c.isInstanceOf[CPPASTExpressionStatement] || c.isInstanceOf[CPPASTDeclarationStatement] || c.isInstanceOf[CPPASTReturnStatement]))  {
-      if(c.isInstanceOf[CPPASTCompoundStatement])
-        collect ++= getFunctionStatements(c)
+    for (c <- node.getChildren ) {
+      if(c.isInstanceOf[CPPASTCompoundStatement]){
+        return expandCompoundStatements(c)
+      }
+
+    }
+    Seq.empty[IASTNode]
+  }
+
+  def expandCompoundStatements(node:IASTNode):Seq[IASTNode] = {
+    val collect = collection.mutable.ArrayBuffer.empty[IASTNode]
+
+    //Recursively get all the statement, seeking first statement if needed to see if it is enter macro
+    for (c <- node.getChildren ) {
+      if(c.isInstanceOf[CPPASTCompoundStatement] || c.isInstanceOf[CPPASTIfStatement] || c.isInstanceOf[CPPASTSwitchStatement] || c.isInstanceOf[CPPASTDoStatement] || c.isInstanceOf[CPPASTWhileStatement])
+        collect ++= expandCompoundStatements(c)
       else  {
         collect += c
       }

@@ -12,4 +12,5 @@ object HssFunctionProblem extends Enumeration {
   val GOOD,FIRST_STATEMENT_NOT_ENTER, LAST_STATEMENT_NOT_EXIT,INSUFFICIENT_STATEMENT = Value
 }
 
-case class HssFunction(sourceFile:String,functionDeclaration: String, startLine:Int,problem:Set[HssFunctionProblem])
+//case class HssFunction(sourceFile:String,functionDeclaration: String, startLine:Int,problem:Set[HssFunctionProblem])
+case class HssFunction(qualifiedName: String, enterLine:Int,exitLine:Seq[Int],problems:Set[HssFunctionProblem])
