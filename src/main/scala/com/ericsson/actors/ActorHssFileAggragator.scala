@@ -147,13 +147,13 @@ class ActorHssFileAggragator(hssCodeRouter:ActorRef,apptraceRouter:ActorRef) ext
 
       val overallCoverage:Double = coveredLines / codeLines * 100
 
-      val noAllExcel = new CSVWriter(new FileWriter("NeverTouchedFunctions.csv"),'\t')
-      val noPerfectExcel = new CSVWriter(new FileWriter("NotPerfectExcel.csv"),'\t')
-      val problemFunctions = new CSVWriter(new FileWriter("ProblemFunctions.csv"),'\t')
+      val noAllExcel = new CSVWriter(new FileWriter("NeverTouchedFunctions.csv"))
+      val noPerfectExcel = new CSVWriter(new FileWriter("NotPerfectExcel.csv"))
+      val problemFunctions = new CSVWriter(new FileWriter("ProblemFunctions.csv"))
       allFunctions.foreach(si => {
         si._2.foreach( re => {
           re.getNeverTouchedFunctions().foreach(fi => {
-            noAllExcel.writeNext ( Array(fi.functionName.stripMargin.replaceAll("\n"," ") , fi.codeFile.fullName.substring(rootPath.length) ))
+            noAllExcel.writeNext ( Array(fi.functionName.stripMargin.replaceAll("\n"," ") , fi.codeFile.fullName ))
           })
         })
       })
@@ -162,7 +162,8 @@ class ActorHssFileAggragator(hssCodeRouter:ActorRef,apptraceRouter:ActorRef) ext
       allFunctions.foreach(si => {
         si._2.foreach( re => {
           re.getNotPerfectFunctions().foreach(fi => {
-            noPerfectExcel.writeNext( Array(fi.functionName.stripMargin.replaceAll("\n"," ") , fi.codeFile.fullName.substring(rootPath.length) , fi.missingEntry.mkString(" ") ))
+
+            noPerfectExcel.writeNext( Array(fi.functionName.stripMargin.replaceAll("\n"," ") , fi.codeFile.fullName, fi.missingEntry.mkString(" ") ))
           })
         })
       })
@@ -170,7 +171,7 @@ class ActorHssFileAggragator(hssCodeRouter:ActorRef,apptraceRouter:ActorRef) ext
       allFunctions.foreach(si => {
         si._2.foreach( re => {
           re.getCorruptedFunctions().foreach(fi => {
-            problemFunctions.writeNext(Array (fi.functionName.stripMargin.replaceAll("\n"," ") , fi.codeFile.fileName.substring(rootPath.length) ))
+            problemFunctions.writeNext(Array (fi.functionName.stripMargin.replaceAll("\n"," ") , fi.codeFile.fileName ))
           })
         })
       })

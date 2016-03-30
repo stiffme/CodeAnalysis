@@ -50,7 +50,7 @@ class HssCodeFileTest extends FunSuite{
   }
 
   test("single test") {
-    val codeFile = new HssCodeFile(HssCodeFileName("""C:\HSSCode\hss16acp0lsv2\16acp0_lsv2\esm\HssEsm_SA\HssEsm_SE\HssEsmServices_BG\HssEsmS6aIncomingServices_OB\HssEsmS6aAppProcess_OU\src\HSS_EsmPurRequestHandler.cc""","HSS_EsmUpdateLastActivityTimeStampFSM.cc"))
+    val codeFile = new HssCodeFile(HssCodeFileName("""C:\HSSCode\hss16acp0lsv2\16acp0_lsv2\esm\HssEsm_SA\HssEsm_SE\HssEsmServices_BG\HssEsmS6aIncomingServices_OB\HssEsmS6aUpdateLocationService_SWCLib\HssEsmS6aUpdateLocationMapSaiServiceAdapter_SCC\src\HSS_EsmS6aUpdateLocationMapSaiServiceAdapter.cc""","HSS_EsmS6aUpdateLocationMapSaiServiceAdapter"))
     assert(codeFile.functions.size > 0)
   }
 }
